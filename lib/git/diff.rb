@@ -70,7 +70,7 @@ module Git
     end
 
     class DiffFile
-      attr_accessor :patch, :path, :mode, :src, :dst, :type
+      attr_accessor :patch, :path, :mode, :src, :dst, :type, :path_a, :path_b
       @base = nil
       NIL_BLOB_REGEXP = /\A0{4,40}\z/.freeze
 
@@ -78,6 +78,8 @@ module Git
         @base = base
         @patch = hash[:patch]
         @path = hash[:path]
+        @path_a = hash[:path_a]
+        @path_b = hash[:path_b]
         @mode = hash[:mode]
         @src = hash[:src]
         @dst = hash[:dst]
@@ -129,9 +131,9 @@ module Git
         final = {}
         current_file = nil
         @full_diff.split("\n").each do |line|
-          if m = /^diff --git a\/(.*?) b\/(.*?)/.match(line)
-            current_file = m[1]
-            final[current_file] = defaults.merge({:patch => line, :path => current_file})
+          if m = /^diff --git a\/(.*) b\/(.*)/.match(line)
+            current_file = m[2]
+            final[current_file] = defaults.merge({:patch => line, :path => current_file, path_a: m[1], path_b: m[2]})
           else
             if m = /^index ([0-9a-f]{4,40})\.\.([0-9a-f]{4,40})( ......)*/.match(line)
               final[current_file][:src] = m[1]
@@ -144,6 +146,9 @@ module Git
             end
             if m = /^Binary files /.match(line)
               final[current_file][:binary] = true
+            end
+            if m = /^similarity index 100%/.match(line)
+              final[current_file][:type] = 'renamed'
             end
             final[current_file][:patch] << "\n" + line
           end
